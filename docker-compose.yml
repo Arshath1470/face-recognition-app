@@ -1,0 +1,42 @@
+name: facefinder
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: facefinder
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-facefinder}
+      POSTGRES_DB: facefinder
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U facefinder -d facefinder"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    image: ghcr.io/arshath1470/facefinder-api:local
+    environment:
+      DATABASE_URL: postgres://facefinder:${POSTGRES_PASSWORD:-facefinder}@db:5432/facefinder
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-before-deploying-0123456789}
+      # Leave empty to run with the simulated detector.
+      CLARIFAI_PAT: ${CLARIFAI_PAT:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./frontend
+    image: ghcr.io/arshath1470/facefinder-web:local
+    ports:
+      - "8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:
